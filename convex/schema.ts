@@ -12,4 +12,10 @@ export default defineSchema({
     content: v.string(),
     role: v.union(v.literal("user"), v.literal("assistant")),
   }).index("by_chat_id", ["chatId"]),
+  files: defineTable({
+    storageId: v.id("_storage"), // This is a reference to the Convex storage object
+    url: v.string(), // This is the URL we can use to download the file
+    name: v.optional(v.string()),
+    description: v.optional(v.string()),
+  }),
 });

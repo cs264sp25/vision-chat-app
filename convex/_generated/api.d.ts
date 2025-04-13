@@ -14,6 +14,7 @@ import type {
   FunctionReference,
 } from "convex/server";
 import type * as chats from "../chats.js";
+import type * as files from "../files.js";
 import type * as messages from "../messages.js";
 import type * as openai from "../openai.js";
 
@@ -27,6 +28,7 @@ import type * as openai from "../openai.js";
  */
 declare const fullApi: ApiFromModules<{
   chats: typeof chats;
+  files: typeof files;
   messages: typeof messages;
   openai: typeof openai;
 }>;

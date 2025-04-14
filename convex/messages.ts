@@ -27,6 +27,7 @@ export const create = mutation({
   args: {
     chatId: v.id("chats"),
     content: v.string(),
+    attachments: v.optional(v.array(v.id("files"))),
   },
   handler: async (ctx, args) => {
     // Check if the chat exists
@@ -43,13 +44,44 @@ export const create = mutation({
       chatId: args.chatId,
       content: args.content,
       role: "user",
+      attachments: args.attachments,
     });
 
-    // Get all messages in the chat so far
+    // Get all messages in the chat so far, including the new one
     const messages = await ctx.db
       .query("messages")
       .withIndex("by_chat_id", (q) => q.eq("chatId", args.chatId))
+      .order("asc") // Ensure messages are in order
       .collect();
+
+    // Transform messages for the AI
+    const messagesForAI = await Promise.all(
+      messages.map(async (message) => {
+        // Start with the text content
+        const contentPayload: Array<
+          { type: "text"; text: string } | { type: "image"; image: string }
+        > = [{ type: "text", text: message.content }];
+
+        // If there are attachments, fetch them and add images to the payload
+        if (message.attachments && message.attachments.length > 0) {
+          const attachmentFiles = await Promise.all(
+            message.attachments.map((fileId) => ctx.db.get(fileId)),
+          );
+
+          for (const file of attachmentFiles) {
+            // Only include images with a valid URL
+            if (file && file.type === "image" && file.url) {
+              contentPayload.push({ type: "image", image: file.url });
+            }
+          }
+        }
+
+        return {
+          role: message.role,
+          content: contentPayload,
+        };
+      }),
+    );
 
     // Store a placeholder message for the assistant
     const placeholderMessageId = await ctx.db.insert("messages", {
@@ -65,10 +97,7 @@ export const create = mutation({
 
     // Schedule an action that calls ChatGPT and updates the message.
     ctx.scheduler.runAfter(0, internal.openai.completion, {
-      messages: messages.map((message) => ({
-        role: message.role,
-        content: message.content,
-      })),
+      messages: messagesForAI, // Pass the transformed messages
       placeholderMessageId,
     });
 

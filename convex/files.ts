@@ -22,31 +22,19 @@ export const getOne = query({
 
 export const create = mutation({
   args: {
-    chatId: v.id("chats"),
     name: v.optional(v.string()),
     description: v.optional(v.string()),
     storageId: v.id("_storage"),
+    type: v.optional(v.union(v.literal("image"), v.literal("other"))),
   },
   handler: async (ctx, args) => {
-    // Check if the chat exists
-    const chat = await ctx.db.get(args.chatId);
-    if (!chat) {
-      throw new ConvexError({
-        code: 404,
-        message: "Chat not found",
-      });
-    }
-
-    // Store the file in the database
-    const fileId = await ctx.db.insert("files", {
+    return await ctx.db.insert("files", {
       name: args.name,
       description: args.description,
       storageId: args.storageId,
       url: (await ctx.storage.getUrl(args.storageId)) as string,
+      type: args.type,
     });
-
-    // Return the file ID
-    return fileId;
   },
 });
 
@@ -55,6 +43,7 @@ export const update = mutation({
     fileId: v.id("files"),
     name: v.optional(v.string()),
     description: v.optional(v.string()),
+    type: v.optional(v.union(v.literal("image"), v.literal("other"))),
   },
   handler: async (ctx, args) => {
     const file = await ctx.db.get(args.fileId);
@@ -68,6 +57,7 @@ export const update = mutation({
     await ctx.db.patch(args.fileId, {
       name: args.name ?? file.name,
       description: args.description ?? file.description,
+      type: args.type ?? file.type,
     });
 
     return true;

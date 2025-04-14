@@ -2,10 +2,52 @@ import { createOpenAI } from "@ai-sdk/openai";
 import { experimental_generateImage, streamText, tool } from "ai";
 import { internalAction } from "./_generated/server";
 import { internal } from "./_generated/api";
-import { v } from "convex/values";
+import { Infer, v } from "convex/values";
 import { z } from "zod";
 
 const DEBUG = true;
+
+const coreSystemMessageSchema = {
+  role: v.literal("system"),
+  content: v.string(),
+};
+
+const coreSystemMessageSchemaObject = v.object(coreSystemMessageSchema);
+type CoreSystemMessage = Infer<typeof coreSystemMessageSchemaObject>;
+
+const coreUserMessageSchema = {
+  role: v.literal("user"),
+  content: v.union(
+    v.array(
+      v.union(
+        v.object({ type: v.literal("text"), text: v.string() }),
+        v.object({ type: v.literal("image"), image: v.string() }),
+        v.object({ type: v.literal("file"), data: v.string() }),
+      ),
+    ),
+    v.string(),
+  ),
+};
+
+const coreUserMessageSchemaObject = v.object(coreUserMessageSchema);
+type CoreUserMessage = Infer<typeof coreUserMessageSchemaObject>;
+
+const coreAssistantMessageSchema = {
+  role: v.literal("assistant"),
+  content: v.union(
+    v.array(
+      v.union(
+        v.object({ type: v.literal("text"), text: v.string() }),
+        v.object({ type: v.literal("image"), image: v.string() }),
+        v.object({ type: v.literal("file"), data: v.string() }),
+      ),
+    ),
+    v.string(),
+  ),
+};
+
+const coreAssistantMessageSchemaObject = v.object(coreAssistantMessageSchema);
+type CoreAssistantMessage = Infer<typeof coreAssistantMessageSchemaObject>;
 
 const openai = createOpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -35,14 +77,15 @@ export const generateImage = internalAction({
   },
 });
 
+const coreMessageSchema = v.union(
+  coreSystemMessageSchemaObject,
+  coreUserMessageSchemaObject,
+  coreAssistantMessageSchemaObject,
+);
+
 export const completion = internalAction({
   args: {
-    messages: v.array(
-      v.object({
-        role: v.union(v.literal("user"), v.literal("assistant")),
-        content: v.string(),
-      }),
-    ),
+    messages: v.array(coreMessageSchema),
     placeholderMessageId: v.id("messages"),
   },
   handler: async (ctx, args) => {
@@ -79,6 +122,7 @@ export const completion = internalAction({
           role: "system",
           content: instructions,
         },
+        // @ts-ignore
         ...args.messages,
       ],
       maxSteps: 10,

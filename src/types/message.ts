@@ -3,6 +3,7 @@ import { z } from "zod";
 export const createMessageSchema = z.object({
   role: z.enum(["user", "assistant"]),
   content: z.string().min(1),
+  attachments: z.array(z.string()).optional(),
 });
 
 export const updateMessageSchema = createMessageSchema.partial();
@@ -11,6 +12,7 @@ export const messageSchema = createMessageSchema.extend({
   _id: z.string(),
   _creationTime: z.number(),
   chatId: z.string(),
+  attachments: z.array(z.string()).optional(),
 });
 
 export type CreateMessageType = z.infer<typeof createMessageSchema>;

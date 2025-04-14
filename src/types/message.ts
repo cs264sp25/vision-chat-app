@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { fileSchema } from "./file";
 
 export const createMessageSchema = z.object({
   role: z.enum(["user", "assistant"]),
@@ -12,7 +13,7 @@ export const messageSchema = createMessageSchema.extend({
   _id: z.string(),
   _creationTime: z.number(),
   chatId: z.string(),
-  attachments: z.array(z.string()).optional(),
+  attachments: z.array(fileSchema).optional(),
 });
 
 export type CreateMessageType = z.infer<typeof createMessageSchema>;

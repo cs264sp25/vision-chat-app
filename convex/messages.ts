@@ -7,10 +7,27 @@ export const getAll = query({
     chatId: v.id("chats"),
   },
   handler: async (ctx, args) => {
-    return ctx.db
+    const messages = await ctx.db
       .query("messages")
       .withIndex("by_chat_id", (q) => q.eq("chatId", args.chatId))
       .collect();
+
+    const messagesWithAttachments = await Promise.all(
+      messages.map(async (message) => {
+        if (message.attachments && message.attachments.length > 0) {
+          const attachmentFiles = await Promise.all(
+            message.attachments.map((fileId) => ctx.db.get(fileId)),
+          );
+          return {
+            ...message,
+            attachments: attachmentFiles,
+          };
+        }
+        return message;
+      }),
+    );
+    
+    return messagesWithAttachments;
   },
 });
 

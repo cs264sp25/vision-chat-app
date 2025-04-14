@@ -8,7 +8,8 @@ import {
   Check,
   Copy,
   Edit,
-  MicVocal,
+  FileIcon,
+  ImageIcon,
   RefreshCw,
   ScanEye,
   User2,
@@ -16,12 +17,86 @@ import {
 import { Button } from "@/components/ui/button";
 import { AutosizeTextarea } from "@/components/ui/autoresize-textarea";
 import Markdown from "@/components/markdown";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import {
+  HoverCard,
+  HoverCardContent,
+  HoverCardTrigger,
+} from "@/components/ui/hover-card";
 
 const DEBUG = false;
 
 interface MessageProps {
   message: MessageType;
 }
+
+interface AttachmentsProps {
+  attachments: NonNullable<MessageType['attachments']>;
+}
+
+const Attachments: React.FC<AttachmentsProps> = ({ attachments }) => {
+  if (!attachments?.length) return null;
+
+  return (
+    <div className="mt-2 flex flex-wrap gap-2">
+      {attachments.map((file, index) => {
+        const isImage = file.type === 'image';
+        
+        const attachmentContent = (
+          <div 
+            key={index}
+            className="flex items-center gap-2 p-2 rounded-md bg-secondary/50 hover:bg-secondary cursor-pointer"
+            onClick={() => window.open(file.url, '_blank')}
+          >
+            {isImage ? (
+              <ImageIcon className="h-4 w-4 text-primary" />
+            ) : (
+              <FileIcon className="h-4 w-4 text-muted-foreground" />
+            )}
+            <span className="text-sm text-foreground">
+              {file.name || `File ${index + 1}`}
+            </span>
+          </div>
+        );
+
+        if (isImage) {
+          return (
+            <HoverCard key={index}>
+              <HoverCardTrigger asChild>
+                {attachmentContent}
+              </HoverCardTrigger>
+              <HoverCardContent className="w-80">
+                <img 
+                  src={file.url} 
+                  alt={file.name || 'Attachment preview'} 
+                  className="rounded-md max-w-full h-auto"
+                />
+              </HoverCardContent>
+            </HoverCard>
+          );
+        }
+
+        return (
+          <TooltipProvider key={index}>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                {attachmentContent}
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Click to {file.type === 'image' ? 'view' : 'download'}</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        );
+      })}
+    </div>
+  );
+};
 
 const Message: React.FC<MessageProps> = ({ message }) => {
   const isAssistant = message.role === "assistant";
@@ -161,7 +236,10 @@ const Message: React.FC<MessageProps> = ({ message }) => {
               </div>
             </div>
           ) : (
-            <Markdown content={messageContent} className="prose-base" />
+            <>
+              <Markdown content={messageContent} className="prose-base" />
+              {message.attachments && <Attachments attachments={message.attachments} />}
+            </>
           )}
         </div>
       </div>

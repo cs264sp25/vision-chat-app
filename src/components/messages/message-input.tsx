@@ -1,11 +1,17 @@
 import { useMutationMessages } from "@/hooks/use-mutation-messages";
 import { useMutationFiles } from "@/hooks/use-mutation-files";
+import { useQueryFile } from "@/hooks/use-query-file";
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Paperclip, Send, X } from "lucide-react";
+import { ImageIcon, Paperclip, Send, X } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import {
+  HoverCard,
+  HoverCardContent,
+  HoverCardTrigger,
+} from "@/components/ui/hover-card";
 
 const DEBUG = false;
 
@@ -19,7 +25,7 @@ const MessageInput: React.FC<MessageInputProps> = ({ chatId }) => {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { add: createMessage } = useMutationMessages(chatId);
-  const { add: createFile } = useMutationFiles();
+  const { add: createFile, delete: deleteFile } = useMutationFiles();
 
   // Auto-focus textarea when component mounts
   useEffect(() => {
@@ -99,8 +105,64 @@ const MessageInput: React.FC<MessageInputProps> = ({ chatId }) => {
     }
   };
 
-  const removeAttachment = (index: number) => {
+  const removeAttachment = async (index: number) => {
+    const fileId = attachments[index];
+    
+    // First remove from UI
     setAttachments(prev => prev.filter((_, i) => i !== index));
+    
+    // Then delete from storage
+    try {
+      await deleteFile(fileId);
+    } catch (error) {
+      console.error('Failed to delete file:', error);
+      // Don't show error to user since the file is already removed from UI
+    }
+  };
+
+  // Render attachment preview
+  const AttachmentPreview = ({ fileId }: { fileId: string }) => {
+    const { data: file, loading } = useQueryFile(fileId);
+    
+    if (loading || !file) return null;
+
+    return (
+      <HoverCard openDelay={200}>
+        <HoverCardTrigger asChild>
+          <div className="relative group">
+            <div className="bg-muted rounded-md px-3 py-1.5 text-sm flex items-center gap-2 cursor-pointer">
+              <ImageIcon className="h-4 w-4 text-primary" />
+              <span className="max-w-[100px] truncate">{file.name || 'Image'}</span>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  const index = attachments.indexOf(fileId);
+                  if (index !== -1) removeAttachment(index);
+                }}
+                className="ml-1 text-muted-foreground hover:text-foreground focus:outline-none"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+        </HoverCardTrigger>
+        <HoverCardContent className="w-64 p-0">
+          <img
+            src={file.url}
+            alt={file.name || 'Image preview'}
+            className="rounded-md max-w-full h-auto"
+            loading="lazy"
+          />
+          {file.name && (
+            <div className="p-2 text-xs text-muted-foreground truncate">
+              {file.name}
+            </div>
+          )}
+        </HoverCardContent>
+      </HoverCard>
+    );
   };
 
   return (
@@ -119,19 +181,8 @@ const MessageInput: React.FC<MessageInputProps> = ({ chatId }) => {
       />
       {attachments.length > 0 && (
         <div className="flex gap-2 px-4 py-2 border-t">
-          {attachments.map((_, index) => (
-            <div key={index} className="relative group">
-              <div className="bg-muted rounded-md px-3 py-1 text-sm">
-                Image {index + 1}
-                <button
-                  type="button"
-                  onClick={() => removeAttachment(index)}
-                  className="ml-2 text-muted-foreground hover:text-foreground"
-                >
-                  <X className="h-4 w-4" />
-                </button>
-              </div>
-            </div>
+          {attachments.map((fileId) => (
+            <AttachmentPreview key={fileId} fileId={fileId} />
           ))}
         </div>
       )}
@@ -192,7 +243,7 @@ const MessageInput: React.FC<MessageInputProps> = ({ chatId }) => {
               "border-2 border-purple-500": DEBUG,
             },
           )}
-          disabled={!text.trim()}
+          disabled={!text.trim() && attachments.length === 0}
         >
           <Send className="h-4 w-4" />
         </Button>

@@ -7,6 +7,8 @@ import { z } from "zod";
 
 const DEBUG = true;
 
+// Types ------------------------------------------------------------
+
 const coreSystemMessageSchema = {
   role: v.literal("system"),
   content: v.string(),
@@ -49,10 +51,20 @@ const coreAssistantMessageSchema = {
 const coreAssistantMessageSchemaObject = v.object(coreAssistantMessageSchema);
 type CoreAssistantMessage = Infer<typeof coreAssistantMessageSchemaObject>;
 
+const coreMessageSchema = v.union(
+  coreSystemMessageSchemaObject,
+  coreUserMessageSchemaObject,
+  coreAssistantMessageSchemaObject,
+);
+
+// OpenAI ------------------------------------------------------------
+
 const openai = createOpenAI({
   apiKey: process.env.OPENAI_API_KEY,
   compatibility: "strict", // strict mode, enable when using the OpenAI API
 });
+
+// Actions ------------------------------------------------------------
 
 export const generateImage = internalAction({
   args: {
@@ -70,18 +82,11 @@ export const generateImage = internalAction({
     }
 
     const blob = new Blob([image.uint8Array], { type: image.mimeType });
-
     const storageId = await ctx.storage.store(blob);
-
     return (await ctx.storage.getUrl(storageId)) as string;
   },
 });
 
-const coreMessageSchema = v.union(
-  coreSystemMessageSchemaObject,
-  coreUserMessageSchemaObject,
-  coreAssistantMessageSchemaObject,
-);
 
 export const completion = internalAction({
   args: {
@@ -158,9 +163,10 @@ export const completion = internalAction({
         // console.log("Step type:", stepType);
         // console.log("Is continued:", isContinued);
 
-        const body = JSON.stringify(request.body, null, 2);
         if (DEBUG) {
-          console.log("Body:", body);
+          // All the messages sent to AI at this point
+          const body = JSON.parse(request.body || "{}");
+          console.log("Request body:", body);
         }
       },
     });

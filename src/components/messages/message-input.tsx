@@ -1,7 +1,8 @@
 import { useMutationMessages } from "@/hooks/use-mutation-messages";
+import { useMutationFiles } from "@/hooks/use-mutation-files";
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Paperclip, Send } from "lucide-react";
+import { Paperclip, Send, X } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -14,8 +15,11 @@ interface MessageInputProps {
 
 const MessageInput: React.FC<MessageInputProps> = ({ chatId }) => {
   const [text, setText] = useState("");
+  const [attachments, setAttachments] = useState<string[]>([]);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const { add: createMessage } = useMutationMessages(chatId);
+  const { add: createFile } = useMutationFiles();
 
   // Auto-focus textarea when component mounts
   useEffect(() => {
@@ -43,13 +47,15 @@ const MessageInput: React.FC<MessageInputProps> = ({ chatId }) => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (text.trim() === "") return;
+    if (text.trim() === "" && attachments.length === 0) return;
 
     await createMessage({
       role: "user",
       content: text,
+      attachments,
     });
     setText("");
+    setAttachments([]);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -59,8 +65,42 @@ const MessageInput: React.FC<MessageInputProps> = ({ chatId }) => {
     }
   };
 
-  const handleFileUpload = async () => {
-    toast.error("File upload is not implemented");
+  const handleFileUpload = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      toast.error('Please select an image file');
+      return;
+    }
+
+    try {
+      const fileId = await createFile({
+        file,
+        name: file.name,
+      });
+
+      if (fileId) {
+        setAttachments(prev => [...prev, fileId]);
+        toast.success('File uploaded successfully');
+      }
+    } catch (error) {
+      toast.error('Failed to upload file');
+    }
+
+    // Reset the file input
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  const removeAttachment = (index: number) => {
+    setAttachments(prev => prev.filter((_, i) => i !== index));
   };
 
   return (
@@ -70,6 +110,31 @@ const MessageInput: React.FC<MessageInputProps> = ({ chatId }) => {
         "border-2 border-red-500": DEBUG,
       })}
     >
+      <input
+        type="file"
+        ref={fileInputRef}
+        onChange={handleFileChange}
+        accept="image/*"
+        className="hidden"
+      />
+      {attachments.length > 0 && (
+        <div className="flex gap-2 px-4 py-2 border-t">
+          {attachments.map((_, index) => (
+            <div key={index} className="relative group">
+              <div className="bg-muted rounded-md px-3 py-1 text-sm">
+                Image {index + 1}
+                <button
+                  type="button"
+                  onClick={() => removeAttachment(index)}
+                  className="ml-2 text-muted-foreground hover:text-foreground"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
       <div
         className={cn(
           "relative flex items-end border border-input bg-background rounded-lg",

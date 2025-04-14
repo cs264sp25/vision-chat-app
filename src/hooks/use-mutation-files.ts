@@ -2,10 +2,12 @@ import { CreateFileType } from "@/types/file";
 import { api } from "../../convex/_generated/api";
 import { useMutation } from "convex/react";
 import { toast } from "sonner";
+import { Id } from "convex/_generated/dataModel";
 
 export function useMutationFiles() {
   const generateUploadUrl = useMutation(api.files.generateUploadUrl);
   const createMutation = useMutation(api.files.create);
+  const deleteMutation = useMutation(api.files.remove);
 
   const createFile = async (
     fileMeta: CreateFileType,
@@ -47,7 +49,20 @@ export function useMutationFiles() {
     }
   };
 
+  const deleteFile = async (fileId: string): Promise<boolean> => {
+    try {
+      await deleteMutation({
+        fileId: fileId as Id<"files">,
+      });
+      return true;
+    } catch (error) {
+      toast.error((error as Error).message || "Failed to delete file");
+      return false;
+    }
+  };
+
   return {
     add: createFile,
+    delete: deleteFile,
   };
 }

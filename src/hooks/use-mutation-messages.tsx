@@ -13,6 +13,7 @@ export function useMutationMessages(chatId: string) {
     try {
       const messageId = await createMutation({
         content: message.content,
+        attachments: message.attachments as Id<"files">[],
         chatId: chatId as Id<"chats">,
       });
       return messageId as string;

@@ -1,15 +1,11 @@
 import { createOpenAI } from "@ai-sdk/openai";
-import {
-  experimental_generateImage,
-  GeneratedFile,
-  streamText,
-  tool,
-} from "ai";
+import { experimental_generateImage, streamText, tool } from "ai";
 import { internalAction } from "./_generated/server";
-import { api, internal } from "./_generated/api";
+import { internal } from "./_generated/api";
 import { v } from "convex/values";
 import { z } from "zod";
-import { Id } from "./_generated/dataModel";
+
+const DEBUG = true;
 
 const openai = createOpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -21,13 +17,15 @@ export const generateImage = internalAction({
     prompt: v.string(),
   },
   handler: async (ctx, args) => {
-    const { image }: { image: GeneratedFile } =
-      await experimental_generateImage({
-        model: openai.image("dall-e-3"),
-        prompt: args.prompt,
-        n: 1,
-        size: "512x512",
-      });
+    const { image } = await experimental_generateImage({
+      model: openai.image("dall-e-3"),
+      prompt: args.prompt,
+      n: 1,
+    });
+
+    if (DEBUG) {
+      console.log("generateImage input prompt:", args.prompt);
+    }
 
     const blob = new Blob([image.uint8Array], { type: image.mimeType });
 
@@ -36,6 +34,7 @@ export const generateImage = internalAction({
     return (await ctx.storage.getUrl(storageId)) as string;
   },
 });
+
 export const completion = internalAction({
   args: {
     messages: v.array(
@@ -116,7 +115,9 @@ export const completion = internalAction({
         // console.log("Is continued:", isContinued);
 
         const body = JSON.stringify(request.body, null, 2);
-        console.log("Body:", body);
+        if (DEBUG) {
+          console.log("Body:", body);
+        }
       },
     });
 
